@@ -1,5 +1,4 @@
 from tkinter import *
-from collections import namedtuple
 
 size_of_board = 600
 entryWidth = 30
@@ -40,7 +39,7 @@ class Tic_Tac_Toe():
 
         Label(self.roomsFrame, text="Existing rooms:", font=("Courier", 20), fg="black").pack(side=TOP)
 
-        self.newRoomName = Entry(self.createRoomFrame, width=20, borderwidt=2, relief="ridge", bg="white")  # needs to add validation here
+        self.newRoomName = Entry(self.createRoomFrame, width=20, borderwidth=2, relief="ridge", bg="white")  # needs to add validation here
 
         self.generateRooms()
 
@@ -55,7 +54,7 @@ class Tic_Tac_Toe():
 
         if len(self.roomsList) > 0:
             for room_number in range(len(self.roomsList)):
-                room_text = "#" + str(room_number+1) + " " + self.roomsList[room_number]["room_name"]
+                room_text = "#" + str(room_number+1) + " " + self.roomsList[room_number]["room_name"] + " / by: " + self.nick.get()
                 Label(self.availableRooms, text=room_text, font=("Courier", 10), fg="black").pack()
 
     def newRoom(self):

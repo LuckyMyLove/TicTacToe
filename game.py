@@ -10,6 +10,7 @@ class singleGame():
         self.window.title('Tic Tac Toe by Jędrzej Jagiełło')
         self.symbol = 'X'
         #self.window.geometry('{}x{}'.format(size_of_board, size_of_board))
+
         #start from:
         self.generateEmptyBoard()
 
@@ -45,10 +46,6 @@ class singleGame():
             messagebox.showinfo("Tied!!", "The match ended in a draw")
             self.reset()
 
-    def generateButton(self, container):  # Function to define a button
-        singleButton = Button(container, text="   ", width=3, padx=5, bd=5, bg="gold2", font=('arial', 60, 'bold'), relief="sunken")
-        return singleButton
-
     def generateEmptyBoard(self):
         content = ttk.Frame(self.window)
         content.grid(row=0, column=0)
@@ -65,9 +62,9 @@ class singleGame():
 
         ttk.Label(self.gameInfo, text="Round 1").grid(row=0, pady="3")
         ttk.Label(self.gameInfo,text="Player1 (X) VS Player2 (O)").grid(row=1, pady="3")
-        ttk.Label(self.gameInfo,text="Player1 WIN / DRAW!").grid(row=2, pady="3")
-        ttk.Button(self.gameInfo, text="Play again").grid(row=3, pady="3")
-        ttk.Button(self.gameInfo, text="Quit").grid(row=4, pady="3")
+        #ttk.Label(self.gameInfo,text="Player1 WIN / DRAW!").grid(row=2, pady="3")
+        #ttk.Button(self.gameInfo, text="Play again").grid(row=3, pady="3")
+        #ttk.Button(self.gameInfo, text="Quit").grid(row=4, pady="3")
 
         ttk.Label(self.gamePoints, text="Score:").grid(row=1)
         ttk.Label(self.gamePoints, text="Player1: 100").grid(row=2)
@@ -80,8 +77,7 @@ class singleGame():
         self.buttonsList = [[], [], []]
         for i in range(3):
             for j in range(3):
-                pass
-                self.buttonsList[i].append(self.generateButton(self.gameBoard))
+                self.buttonsList[i].append(Button(self.gameBoard, text="   ", width=3, padx=5, bd=5, bg="gold2", font=('arial', 60, 'bold'), relief="sunken"))
                 self.buttonsList[i][j].config(command=lambda row=i, col=j: self.click(row, col))
                 self.buttonsList[i][j].grid(row=i, column=j)
 

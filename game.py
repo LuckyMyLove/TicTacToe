@@ -1,5 +1,6 @@
 from tkinter import *
 from tkinter import ttk, messagebox
+from pymongo import MongoClient
 import random as random
 
 size_of_board = 600
@@ -89,5 +90,18 @@ class singleGame():
         self.changePlayer()
         # label.config(text=self.symbol + "'s Chance")
 
-game_instance = singleGame()
-game_instance.mainloop()
+
+def start_the_game(u1_id, u2_id, room_id):
+    cluster = MongoClient('mongodb+srv://dBUser:72qNFNDh5uGIQcrB@maincluster.3mttb.mongodb.net/TicTacToe?retryWrites=true&w=majority')
+    db = cluster['TicTacToe']
+    usersData = db['userData']
+
+    current_room = db['gamesData'].find({"_id": room_id})
+    u1_nick = usersData.find_one({"_id": u1_id})["username"]
+    if(u2_id != ''):
+        u2_nick = usersData.find_one({"_id": u2_id})["username"]
+        game_instance = singleGame()
+        game_instance.mainloop()
+    else:
+        print("waiting for opponent")
+

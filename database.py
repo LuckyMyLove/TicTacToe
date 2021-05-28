@@ -14,14 +14,15 @@ collection = db['gamesData']
 #tylko dla jednego wyniku
 # result = collection.find_one({"id_u1":"testUser1"})
 # print(result)
+# print(result["id_u1"])
 
 #UPDATE (single)
-update = collection.update_one({"id_u1": "testUser1"}, {"$set":{"id_u1": "testUser1_UPDATED"}})  #podajemy najpierw warunek, potem co ma się zadziać ($set jest jedną z wielu komend)
+#update = collection.update_one({"id_u1": "testUser1"}, {"$set":{"id_u1": "testUser1_UPDATED"}})  #podajemy najpierw warunek, potem co ma się zadziać ($set jest jedną z wielu komend)
 
 
 
-#INSERT (single)
-# test_post = {"_id": 0, "id_u1": "testUser1", "id_u2": "testUser2", "room": ["room_name", "0"], "symbol_u1": "X", "symbol_u2": "O", "result": 0}
+# #INSERT (single)
+# test_post = {"id_u1": "testUser1", "id_u2": "testUser2", "room": ["room_name", "0"], "symbol_u1": "X", "symbol_u2": "O", "result": 0}
 # collection.insert_one(test_post)
 
 #INSERT (many)

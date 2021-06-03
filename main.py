@@ -3,9 +3,6 @@ from game import *
 size_of_board = 600
 entry_width = 30
 
-
-
-
 class Tic_Tac_Toe():
     def __init__(self):
         cluster = MongoClient('mongodb+srv://dBUser:72qNFNDh5uGIQcrB@maincluster.3mttb.mongodb.net/TicTacToe?retryWrites=true&w=majority')
@@ -31,12 +28,14 @@ class Tic_Tac_Toe():
         Label(self.login_window_frame, text="Please insert your nick:", font=30, fg="black").pack(pady=5)
         self.nick = Entry(self.login_window_frame, width = entry_width, borderwidth = 2, relief="ridge", bg="white") #needs to add validation here
         self.nick.pack(pady=(0,5))
-        loginWindowButton = Button(self.login_window_frame, text="Next", width= 10, command = lambda: self.try_login()).pack()
+        Button(self.login_window_frame, text="Next", width= 10, command = lambda: self.try_login()).pack()
 
     def try_login(self):
         #if we already have provided nick in db, throw error
         if self.users_data.find_one({"username": self.nick.get()}):
-            messagebox.showinfo('Duplicate nick',"There already is nick like this in DB, please provide another one.")
+            messagebox.showinfo('Duplicate nick','There already is nick like this in DB, please provide another one.')
+        elif self.nick.get() == '' or str(self.nick.get()).isspace():
+            messagebox.showinfo('Error', "Please add nick which won't be only from whitespaces.")
         else:
             new_user = {"username": self.nick.get(), "points": 0}
             self.users_data.insert_one(new_user)
@@ -96,7 +95,8 @@ class Tic_Tac_Toe():
     def new_room(self):
         if self.game_data.find_one({"room_name":  self.new_room_name.get()}):
             messagebox.showinfo('Duplicate room name',"There is already room with name like this in DB, please provide another one.")
-
+        elif self.new_room_name.get() == '' or str(self.new_room_name.get()).isspace():
+            messagebox.showinfo('Error', "Please add room name which won't be only from whitespaces.")
         else:
             new_room = {"u1_id": self.users_data.find_one({"username": self.nick.get()})["_id"], "u2_id": "", "room_name": self.new_room_name.get(), "symbol_u1": "X", "symbol_u2": "O", "moves": [], "result": 0}
             self.game_data.insert_one(new_room)

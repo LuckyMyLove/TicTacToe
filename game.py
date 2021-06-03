@@ -13,10 +13,26 @@ class singleGame():
         #self.window.geometry('{}x{}'.format(size_of_board, size_of_board))
 
         #start from:
-        self.generateEmptyBoard()
+        #self.waitingRoom()
 
     def mainloop(self):
         self.window.mainloop()
+
+    def waitingRoom(self, u1_id, u2_id, room_id):
+        cluster = MongoClient('mongodb+srv://dBUser:72qNFNDh5uGIQcrB@maincluster.3mttb.mongodb.net/TicTacToe?retryWrites=true&w=majority')
+        db = cluster['TicTacToe']
+        self.usersData = db['userData']
+
+        self.current_room = db['gamesData'].find({"_id": room_id})
+        self.u1_nick = self.usersData.find_one({"_id": u1_id})["username"]
+        if (u2_id != ''):
+            self.u2_nick = self.usersData.find_one({"_id": u2_id})["username"]
+            self.generateEmptyBoard()
+        else:
+            frame = LabelFrame(self.window, relief="flat")
+            frame.pack(expand=True, pady=size_of_board / 3)
+            Label(frame, text="Waiting for second player...", font=50, fg="black").pack(pady=5)
+
 
     def changePlayer(self):  # Function to change the operand for the next player
         for i in ['O', 'X']:
@@ -61,15 +77,12 @@ class singleGame():
         self.gamePoints.grid(column=1, row=1)
         self.gameHistory.grid(column=1, row=2)
 
-        ttk.Label(self.gameInfo, text="Round 1").grid(row=0, pady="3")
-        ttk.Label(self.gameInfo,text="Player1 (X) VS Player2 (O)").grid(row=1, pady="3")
-        #ttk.Label(self.gameInfo,text="Player1 WIN / DRAW!").grid(row=2, pady="3")
-        #ttk.Button(self.gameInfo, text="Play again").grid(row=3, pady="3")
-        #ttk.Button(self.gameInfo, text="Quit").grid(row=4, pady="3")
+        #self.chance_label = ttk.Label(self.gameInfo, text=self.symbol + "'s Chance").grid(row=0, pady="3")
+        ttk.Label(self.gameInfo,text='{} (X) VS {} (O)'.format(self.u1_nick, self.u2_nick), font=('arial', 15, 'bold')).grid(row=1, pady="3")
 
         ttk.Label(self.gamePoints, text="Score:").grid(row=1)
-        ttk.Label(self.gamePoints, text="Player1: 100").grid(row=2)
-        ttk.Label(self.gamePoints, text="Player2: 300").grid(row=3)
+        ttk.Label(self.gamePoints, text="{}: {}".format(self.u1_nick, self.usersData.find_one({"username": self.u1_nick})["points"])).grid(row=2)
+        ttk.Label(self.gamePoints, text="{}: {}".format(self.u2_nick, self.usersData.find_one({"username": self.u2_nick})["points"])).grid(row=2)
 
         ttk.Label(self.gameHistory, text="Round history:").grid(row=1)
         ttk.Label(self.gameHistory, text="Player1: 1, 1").grid(row=2)
@@ -82,26 +95,33 @@ class singleGame():
                 self.buttonsList[i][j].config(command=lambda row=i, col=j: self.click(row, col))
                 self.buttonsList[i][j].grid(row=i, column=j)
 
-
     def click(self, row, col):
         symbolColour = {'O': "firebrick3", 'X': "Dodgerblue2"}
         self.buttonsList[row][col].config(text=self.symbol, state=DISABLED, disabledforeground=symbolColour[self.symbol])
         self.check()
         self.changePlayer()
-        # label.config(text=self.symbol + "'s Chance")
-
+        #self.chance_label.config(text=self.symbol + "'s Chance")
 
 def start_the_game(u1_id, u2_id, room_id):
-    cluster = MongoClient('mongodb+srv://dBUser:72qNFNDh5uGIQcrB@maincluster.3mttb.mongodb.net/TicTacToe?retryWrites=true&w=majority')
-    db = cluster['TicTacToe']
-    usersData = db['userData']
+    game_instance = singleGame()
+    game_instance.waitingRoom(u1_id, u2_id, room_id)
+    game_instance.mainloop()
 
-    current_room = db['gamesData'].find({"_id": room_id})
-    u1_nick = usersData.find_one({"_id": u1_id})["username"]
-    if(u2_id != ''):
-        u2_nick = usersData.find_one({"_id": u2_id})["username"]
-        game_instance = singleGame()
-        game_instance.mainloop()
-    else:
-        print("waiting for opponent")
+
+
+
+# def start_the_game(u1_id, u2_id, room_id):
+#     cluster = MongoClient('mongodb+srv://dBUser:72qNFNDh5uGIQcrB@maincluster.3mttb.mongodb.net/TicTacToe?retryWrites=true&w=majority')
+#     db = cluster['TicTacToe']
+#     usersData = db['userData']
+#
+#     current_room = db['gamesData'].find({"_id": room_id})
+#     u1_nick = usersData.find_one({"_id": u1_id})["username"]
+#     if(u2_id != ''):
+#         u2_nick = usersData.find_one({"_id": u2_id})["username"]
+#         game_instance = singleGame()
+#         game_instance.mainloop()
+#     else:
+#         waitng_room = waitingRoom()
+#         waitng_room.mainloop()
 

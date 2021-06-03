@@ -6,10 +6,10 @@ collection = db['gamesData']
 
 #SELECT
 #dla wielu wyników:
-# results = collection.find({"id_u1":"testUser1"})
-#
-# for singleResult in results:
-#     print(singleResult["id_u1"])
+results = collection.find()
+
+for singleResult in results:
+    print(singleResult)
 
 #tylko dla jednego wyniku
 # result = collection.find_one({"id_u1":"testUser1"})

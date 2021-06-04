@@ -22,11 +22,15 @@ class singleGame():
         cluster = MongoClient('mongodb+srv://dBUser:72qNFNDh5uGIQcrB@maincluster.3mttb.mongodb.net/TicTacToe?retryWrites=true&w=majority')
         db = cluster['TicTacToe']
         self.usersData = db['userData']
+        self.gamesData = db['gamesData']
+        self.current_room_id = room_id
 
-        self.current_room = db['gamesData'].find({"_id": room_id})
+        #self.current_room_id = self.gamesData.find_one({"_id": room_id})
+
         self.u1_nick = self.usersData.find_one({"_id": u1_id})["username"]
         if (u2_id != ''):
             self.u2_nick = self.usersData.find_one({"_id": u2_id})["username"]
+            self.gamesData.update_one({"_id": self.current_room_id}, {"$set": {"u2_id": u2_id}})
             self.generateEmptyBoard()
         else:
             frame = LabelFrame(self.window, relief="flat")
@@ -40,28 +44,25 @@ class singleGame():
                 self.symbol = i
                 break
 
-    def reset(self):  # Resets the game
-        for i in range(3):
-            for j in range(3):
-                self.buttonsList[i][j]["text"] = " "
-                self.buttonsList[i][j]["state"] = NORMAL
-        #self.symbol = random.choice(['O', 'X'])
+    def finish(self):  # Resets the game
+        self.gamesData.update_one({"_id": self.current_room_id}, {"$set": {"is_finished": 1}})
+        self.window.destroy()
 
     def check(self):  # Checks for victory or Draw
         for i in range(3):
             if (self.buttonsList[i][0]["text"] == self.buttonsList[i][1]["text"] == self.buttonsList[i][2]["text"] == self.symbol or self.buttonsList[0][i]["text"] == self.buttonsList[1][i]["text"] == self.buttonsList[2][i]["text"] == self.symbol):
                 messagebox.showinfo("Congrats!!", "'" + self.symbol + "' has won")
-                self.reset()
+                self.finish()
 
         if (self.buttonsList[0][0]["text"] == self.buttonsList[1][1]["text"] == self.buttonsList[2][2]["text"] == self.symbol or self.buttonsList[0][2]["text"] == self.buttonsList[1][1]["text"] == self.buttonsList[2][0]["text"] == self.symbol):
             messagebox.showinfo("Congrats!!", "'" + self.symbol + "' has won")
-            self.reset()
+            self.finish()
 
         #DRAW
         elif (self.buttonsList[0][0]["state"] == self.buttonsList[0][1]["state"] == self.buttonsList[0][2]["state"] == self.buttonsList[1][0]["state"] == self.buttonsList[1][1]["state"] == self.buttonsList[1][2]["state"] ==
               self.buttonsList[2][0]["state"] == self.buttonsList[2][1]["state"] == self.buttonsList[2][2]["state"] == DISABLED):
-            messagebox.showinfo("Tied!!", "The match ended in a draw")
-            self.reset()
+            messagebox.showinfo("DRAW!", "The match ended in a draw")
+            self.finish()
 
     def generateEmptyBoard(self):
         content = ttk.Frame(self.window)

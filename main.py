@@ -3,6 +3,7 @@ from game import *
 size_of_board = 600
 entry_width = 30
 
+
 class Tic_Tac_Toe():
     def __init__(self):
         cluster = MongoClient('mongodb+srv://dBUser:72qNFNDh5uGIQcrB@maincluster.3mttb.mongodb.net/TicTacToe?retryWrites=true&w=majority')
@@ -15,7 +16,7 @@ class Tic_Tac_Toe():
         self.window.geometry('{}x{}'.format(size_of_board, size_of_board))
 
         self.rooms_list = self.game_data.find()
-        #start from:
+        # start from:
         self.login_window()
 
     def mainloop(self):
@@ -26,14 +27,14 @@ class Tic_Tac_Toe():
         self.login_window_frame.pack(expand=True, pady=size_of_board / 3)
 
         Label(self.login_window_frame, text="Please insert your nick:", font=30, fg="black").pack(pady=5)
-        self.nick = Entry(self.login_window_frame, width = entry_width, borderwidth = 2, relief="ridge", bg="white") #needs to add validation here
-        self.nick.pack(pady=(0,5))
-        Button(self.login_window_frame, text="Next", width= 10, command = lambda: self.try_login()).pack()
+        self.nick = Entry(self.login_window_frame, width=entry_width, borderwidth=2, relief="ridge", bg="white")
+        self.nick.pack(pady=(0, 5))
+        Button(self.login_window_frame, text="Next", width=10, command=lambda: self.try_login()).pack()
 
     def try_login(self):
-        #if we already have provided nick in db, throw error
+        # if we already have provided nick in db, throw error
         if self.users_data.find_one({"username": self.nick.get()}):
-            messagebox.showinfo('Duplicate nick','There already is nick like this in DB, please provide another one.')
+            messagebox.showinfo('Duplicate nick', 'There already is nick like this in DB, please provide another one.')
         elif self.nick.get() == '' or str(self.nick.get()).isspace():
             messagebox.showinfo('Error', "Please add nick which won't be only from whitespaces.")
         else:
@@ -53,13 +54,15 @@ class Tic_Tac_Toe():
         self.create_room_frame.pack(side=BOTTOM)
 
         Label(self.rooms_frame, text="Existing rooms:", font=("Courier", 20), fg="black").pack(side=TOP)
+        Button(self.create_room_frame, text="Refresh rooms", width=15, command=lambda: self.generate_rooms(), justify="right").pack(
+            side=TOP)
 
-        self.new_room_name = Entry(self.create_room_frame, width=20, borderwidth=2, relief="ridge", bg="white")  # needs to add validation here
+        self.new_room_name = Entry(self.create_room_frame, width=20, borderwidth=2, relief="ridge", bg="white")
 
         self.generate_rooms()
 
         self.new_room_name.pack(side=TOP)
-        Button(self.create_room_frame, text="Create new room", width=15, command = lambda: self.new_room(), justify="right").pack(
+        Button(self.create_room_frame, text="Create new room", width=15, command=lambda: self.new_room(), justify="right").pack(
             side=TOP)
 
     def enter_room(self, room_id):
@@ -72,11 +75,12 @@ class Tic_Tac_Toe():
         if self.nick.get() == u1_nick:
             start_the_game(current_user_id, '', room_id)
         else:
-            self.game_data.update_one({"_id": "room_id"}, {"$set":{"id_u2": current_user_id}})
+            self.game_data.update_one({"_id": "room_id"}, {"$set": {"id_u2": current_user_id}})
             start_the_game(u1_id, current_user_id, room_id)
 
-
     def generate_rooms(self):
+        self.rooms_list = self.game_data.find()
+
         for widget in self.available_rooms.winfo_children():
             widget.destroy()
 
@@ -85,25 +89,25 @@ class Tic_Tac_Toe():
 
             if room_creator == self.nick.get():
                 room_text = str("# " + room["room_name"] + " / created by: YOU")
-                Button(self.available_rooms, text=room_text, font=("Courier", 10), fg="dark orchid", command=lambda room_id=room['_id']: self.enter_room(room_id)).pack()
+                Button(self.available_rooms, text=room_text, font=("Courier", 10), fg="dark orchid",
+                       command=lambda room_id=room['_id']: self.enter_room(room_id)).pack()
 
             else:
                 room_text = str("# " + room["room_name"] + " / created by: " + room_creator)
-                Button(self.available_rooms, text=room_text, font=("Courier", 10), fg="black", command=lambda room_id=room['_id']: self.enter_room(room_id)).pack()
-
+                Button(self.available_rooms, text=room_text, font=("Courier", 10), fg="black",
+                       command=lambda room_id=room['_id']: self.enter_room(room_id)).pack()
 
     def new_room(self):
-        if self.game_data.find_one({"room_name":  self.new_room_name.get()}):
-            messagebox.showinfo('Duplicate room name',"There is already room with name like this in DB, please provide another one.")
+        if self.game_data.find_one({"room_name": self.new_room_name.get()}):
+            messagebox.showinfo('Duplicate room name', "There is already room with name like this in DB, please provide another one.")
         elif self.new_room_name.get() == '' or str(self.new_room_name.get()).isspace():
             messagebox.showinfo('Error', "Please add room name which won't be only from whitespaces.")
         else:
-            new_room = {"u1_id": self.users_data.find_one({"username": self.nick.get()})["_id"], "u2_id": "", "room_name": self.new_room_name.get(), "symbol_u1": "X", "symbol_u2": "O", "moves": [], "result": 0}
+            new_room = {"u1_id": self.users_data.find_one({"username": self.nick.get()})["_id"], "u2_id": "",
+                        "room_name": self.new_room_name.get(), "symbol_u1": "X", "symbol_u2": "O", "moves": [], "result": 0}
             self.game_data.insert_one(new_room)
-            self.rooms_list = self.game_data.find()
             self.generate_rooms()
             self.enter_room(self.game_data.find_one({"u1_id": new_room["u1_id"]})["_id"])
-
 
 
 game_instance = Tic_Tac_Toe()

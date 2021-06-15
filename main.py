@@ -1,4 +1,5 @@
 from game import *
+from db_connection import *
 
 size_of_board = 600
 entry_width = 30
@@ -6,16 +7,11 @@ entry_width = 30
 
 class Tic_Tac_Toe():
     def __init__(self):
-        cluster = MongoClient('mongodb+srv://dBUser:72qNFNDh5uGIQcrB@maincluster.3mttb.mongodb.net/TicTacToe?retryWrites=true&w=majority')
-        db = cluster['TicTacToe']
-        self.users_data = db['userData']
-        self.game_data = db['gamesData']
-
         self.window = Tk()
         self.window.title('Tic Tac Toe by Jędrzej Jagiełło')
         self.window.geometry('{}x{}'.format(size_of_board, size_of_board))
 
-        self.rooms_list = self.game_data.find()
+        self.rooms_list = game_data.find()
         # start from:
         self.login_window()
 
@@ -33,17 +29,18 @@ class Tic_Tac_Toe():
 
     def try_login(self):
         # if we already have provided nick in db, throw error
-        if self.users_data.find_one({"username": self.nick.get()}):
+        if users_data.find_one({"username": self.nick.get()}):
             self.lobby_list()
         elif self.nick.get() == '' or str(self.nick.get()).isspace():
             messagebox.showinfo('Error', "Please add nick which won't be only from whitespaces.")
         else:
             new_user = {"username": self.nick.get(), "points": 0}
-            self.users_data.insert_one(new_user)
+            users_data.insert_one(new_user)
             self.lobby_list()
 
     def lobby_list(self):
-        self.login_window_frame.pack_forget()
+        if self.login_window_frame:
+            self.login_window_frame.pack_forget()
 
         self.rooms_frame = LabelFrame(self.window, relief="flat", height=100, width=600)
         self.available_rooms = LabelFrame(self.window, relief="flat", height=400, width=600)
@@ -66,11 +63,12 @@ class Tic_Tac_Toe():
             side=TOP)
 
     def enter_room(self, room_id):
-        current_room = self.game_data.find_one({"_id": room_id})
-        current_user_id = self.users_data.find_one({"username": self.nick.get()})["_id"]
+        current_room = game_data.find_one({"_id": room_id})
+        current_user_id = users_data.find_one({"username": self.nick.get()})["_id"]
 
         u1_id = current_room["u1_id"]
         u2_id = current_room["u2_id"]
+        print(u1_id)
 
         if current_user_id == u1_id and u2_id == "":
             start_the_game(current_user_id, '', room_id)
@@ -79,11 +77,11 @@ class Tic_Tac_Toe():
             start_the_game(current_user_id, u2_id, room_id)
 
         elif current_user_id != u1_id and u2_id == current_user_id:
-            self.game_data.update_one({"_id": "room_id"}, {"$set": {"id_u2": current_user_id}})
+            game_data.update_one({"_id": "room_id"}, {"$set": {"id_u2": current_user_id}})
             start_the_game(u1_id, current_user_id, room_id)
 
         elif current_user_id != u1_id and u2_id == "":
-            self.game_data.update_one({"_id": "room_id"}, {"$set": {"id_u2": current_user_id}})
+            game_data.update_one({"_id": "room_id"}, {"$set": {"id_u2": current_user_id}})
             start_the_game(u1_id, current_user_id, room_id)
 
         else:
@@ -91,14 +89,14 @@ class Tic_Tac_Toe():
 
 
     def generate_rooms(self):
-        self.rooms_list = self.game_data.find()
+        self.rooms_list = game_data.find()
 
         for widget in self.available_rooms.winfo_children():
             widget.destroy()
 
         for room in self.rooms_list:
             if room["is_finished"] == 0:
-                room_creator = self.users_data.find_one({'_id': room["u1_id"]})["username"]
+                room_creator = users_data.find_one({'_id': room["u1_id"]})["username"]
 
                 if room_creator == self.nick.get():
                     room_text = str("# " + room["room_name"] + " / created by: YOU")
@@ -106,7 +104,7 @@ class Tic_Tac_Toe():
                            command=lambda room_id=room['_id']: self.enter_room(room_id)).pack()
 
                 elif room["u2_id"] != "":
-                    room_text = str("# " + room["room_name"] + " / created by: " + room_creator + "\n" + room_creator + " vs " + self.users_data.find_one({'_id': room["u2_id"]})["username"])
+                    room_text = str("# " + room["room_name"] + " / created by: " + room_creator + "\n" + room_creator + " vs " + users_data.find_one({'_id': room["u2_id"]})["username"])
                     Button(self.available_rooms, text=room_text, font=("Courier", 10), fg="firebrick3",
                            command=lambda room_id=room['_id']: self.enter_room(room_id)).pack()
 
@@ -116,17 +114,19 @@ class Tic_Tac_Toe():
                            command=lambda room_id=room['_id']: self.enter_room(room_id)).pack()
 
     def new_room(self):
-        if self.game_data.find_one({"room_name": self.new_room_name.get()}):
+        if game_data.find_one({"room_name": self.new_room_name.get()}):
             messagebox.showinfo('Duplicate room name', "There is already room with name like this in DB, please provide another one.")
+
         elif self.new_room_name.get() == '' or str(self.new_room_name.get()).isspace():
             messagebox.showinfo('Error', "Please add room name which won't be only from whitespaces.")
+
         else:
-            new_room = {"u1_id": self.users_data.find_one({"username": self.nick.get()})["_id"], "u2_id": "",
-                        "room_name": self.new_room_name.get(), "symbol_u1": "X", "symbol_u2": "O", "moves": [], "winner": 0,
-                        "is_finished": 0}
-            self.game_data.insert_one(new_room)
+            new_room = {"u1_id": users_data.find_one({"username": self.nick.get()})["_id"], "u2_id": "",
+                        "room_name": self.new_room_name.get(), "symbol_u1": "X", "symbol_u2": "O", "moves": [],
+                        "current_turn": users_data.find_one({"username": self.nick.get()})["_id"],"is_finished": 0}
+            game_data.insert_one(new_room)
             self.generate_rooms()
-            self.enter_room(self.game_data.find_one({"u1_id": new_room["u1_id"]})["_id"])
+            self.enter_room(game_data.find_one({"u1_id": new_room["u1_id"]})["_id"])
 
 
 game_instance = Tic_Tac_Toe()

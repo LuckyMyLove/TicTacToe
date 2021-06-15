@@ -13,16 +13,16 @@ PORT = 5050
 FORMAT = 'utf-8'
 
 list_labels = []
+board_checked_fields = []
 num_cols = 3
 your_turn = False
 you_started = False
 
-
 your_details = {
     "name": "Charles",
     "symbol": "X",
-    "color" : "",
-    "score" : 0
+    "color": "",
+    "score": 0
 }
 
 opponent_details = {
@@ -32,10 +32,9 @@ opponent_details = {
     "score": 0
 }
 
-
 # MAIN GAME WINDOW
 window = Tk()
-window.title("Tic-Tac-Toe Client")
+window.title("Tic-Tac-Toe by Jędrzej Jagiełło")
 content = Frame(window)
 content.grid(row=0, column=0)
 
@@ -50,7 +49,7 @@ gamePoints.grid(column=1, row=1)
 gameHistory.grid(column=1, row=2)
 
 # self.chance_label = ttk.Label(self.gameInfo, text=self.symbol + "'s Chance").grid(row=0, pady="3")
-#ttk.Label(gameInfo, text='{} (X) VS {} (O)'.format(u1_nick, u2_nick), font=('arial', 15, 'bold')).grid(row=1, pady="3")
+# ttk.Label(gameInfo, text='{} (X) VS {} (O)'.format(u1_nick, u2_nick), font=('arial', 15, 'bold')).grid(row=1, pady="3")
 lbl_status = ttk.Label(gameInfo, text="Status: Not connected to server", font="Helvetica 14 bold")
 lbl_status.grid(row=1, pady="3")
 
@@ -78,10 +77,32 @@ for i in range(3):
 
 
 def click(row, col):
-    buttonsList[row][col].config(text=your_details["symbol"], state=DISABLED, disabledforeground=your_details["color"])
+    global your_turn, board_checked_fields
+    if your_turn == True:
+        if board_checked_fields == []:
+            board_checked_fields = [{"row": row, "col": col, "symbol": your_details["symbol"]}]
+        else:
+            board_checked_fields.append({"row": row, "col": col, "symbol": your_details["symbol"]})
+        buttonsList[row][col].config(text=your_details["symbol"], state=DISABLED, disabledforeground=your_details["color"])
+        client.send(json.dumps({"command": "new_move", "updated_board": board_checked_fields}).encode(FORMAT))
+        your_turn = False
+        lbl_status["text"] = "STATUS: " + opponent_details["name"] + "'s turn!"
+
     # check()  # wysłanie informacji na server
     # changePlayer()
-    # self.chance_label.config(text=self.symbol + "'s Chance")
+
+
+def update_board(updated_board):
+    global your_turn, your_details, board_checked_fields
+    if len(updated_board) > len(board_checked_fields):
+        board_checked_fields = updated_board
+        your_turn = True
+        lbl_status["text"] = "STATUS: Your turn! (" + your_details["symbol"] + ")"
+
+    for single_move in board_checked_fields:
+        color = your_details["color"] if single_move["symbol"] == your_details["symbol"] else opponent_details["color"]
+        buttonsList[single_move["row"]][single_move["col"]].config(text=single_move["symbol"], state=DISABLED, disabledforeground=color)
+
 
 def connect_to_server(game_data):
     global client, PORT, SERVER
@@ -90,13 +111,8 @@ def connect_to_server(game_data):
     try:
         client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         client.connect((SERVER, PORT))
-        client.send(game_data.encode(FORMAT))  # Send name to server after connecting
-        # start a thread to keep receiving message from server
-        # do not block the main thread :)
+        client.send(game_data.encode(FORMAT))
         threading._start_new_thread(receive_message_from_server, (client, "m"))
-        #top_frame.pack(side=TOP)
-        #window.title("Tic-Tac-Toe Client - " + game_data["player_id"])
-        window.title("Tic-Tac-Toe Client")
 
 
     except Exception as e:
@@ -105,7 +121,7 @@ def connect_to_server(game_data):
         #     PORT) + " Server may be Unavailable. Try again later")
 
 
-def init(arg0, arg1):
+def init():
     global list_labels, your_turn, your_details, opponent_details, you_started
 
     sleep(3)
@@ -128,37 +144,36 @@ def init(arg0, arg1):
     if you_started:
         you_started = False
         your_turn = False
-        lbl_status["text"] = "STATUS: " + opponent_details["name"] + "'s turn!"
+        lbl_status["text"] = "STATUS: " + opponent_details["name"] + "'s turn! (" + opponent_details["symbol"] + ")"
     else:
         you_started = True
         your_turn = True
-        lbl_status["text"] = "STATUS: Your turn!"
+        lbl_status["text"] = "STATUS: Your turn! (" + your_details["symbol"] + ")"
+
 
 def receive_message_from_server(client_socket, m):
     global your_details, opponent_details, your_turn, you_started
     while True:
         from_server = client_socket.recv(4096).decode(FORMAT)
-        print(from_server)
         if not from_server: break
-        #tutaj mniej wiecej skonczyłem
-        if from_server.startswith("welcome"):
-            if from_server == "welcome_first_player":
-                your_details["color"] = "firebrick3"
-                opponent_details["color"] = "Dodgerblue2"
-                lbl_status["text"] = "Server: Welcome " + your_details["name"] + "! Waiting for second player"
 
-            elif from_server == "welcome_second_player":
-                lbl_status["text"] = "Server: Welcome " + your_details["name"] + "! Game will start soon"
-                your_details["color"] = "Dodgerblue2"
-                opponent_details["color"] = "firebrick3"
+        msg = json.loads(from_server)
 
-        elif from_server.startswith("opponent_name$"):
-            temp = from_server.replace("opponent_name$", "")
-            temp = temp.replace("symbol", "")
-            name_index = temp.find("$")
-            symbol_index = temp.rfind("$")
-            opponent_details["name"] = temp[0:name_index]
-            your_details["symbol"] = temp[symbol_index:len(temp)]
+        if msg["command"] == "welcome_first_player":
+            your_details["color"] = "firebrick3"
+            opponent_details["color"] = "Dodgerblue2"
+            lbl_status["text"] = "Server: Welcome " + your_details["name"] + "! Waiting for second player"
+            update_board(msg["updated_board"])
+
+        elif msg["command"] == "welcome_second_player":
+            lbl_status["text"] = "Server: Welcome " + your_details["name"] + "! Game will start soon"
+            your_details["color"] = "Dodgerblue2"
+            opponent_details["color"] = "firebrick3"
+            update_board(msg["updated_board"])
+
+        elif msg["command"] == "opponent_name":
+            opponent_details["name"] = msg["enemy_nick"]
+            your_details["symbol"] = msg["your_symbol"]
 
             # set opponent symbol
             if your_details["symbol"] == "X":
@@ -170,45 +185,48 @@ def receive_message_from_server(client_socket, m):
             sleep(3)
             # is it your turn to play? hey! 'O' comes before 'X'
             if your_details["symbol"] == "X":
-                lbl_status["text"] = "STATUS: Your turn!"
+                lbl_status["text"] = "STATUS: Your turn! (" + your_details["symbol"] + ")"
                 your_turn = True
                 you_started = True
+
             else:
-                lbl_status["text"] = "STATUS: " + opponent_details["name"] + "'s turn!"
+                lbl_status["text"] = "STATUS: " + opponent_details["name"] + "'s turn! (" + opponent_details["symbol"] + ")"
                 you_started = False
                 your_turn = False
 
-        elif from_server.startswith("$xy$"):
-            temp = from_server.replace("$xy$", "")
-            _x = temp[0:temp.find("$")]
-            _y = temp[temp.find("$") + 1:len(temp)]
+        elif msg["command"] == "new_move":
+            update_board(msg["updated_board"])
 
-            # update board
-            label_index = int(_x) * num_cols + int(_y)
-            label = list_labels[label_index]
-            label["symbol"] = opponent_details["symbol"]
-            label["label"]["text"] = opponent_details["symbol"]
-            label["label"].config(foreground=opponent_details["color"])
-            label["ticked"] = True
+            # temp = from_server.replace("$xy$", "")
+            # _x = temp[0:temp.find("$")]
+            # _y = temp[temp.find("$") + 1:len(temp)]
 
-            # Does this cordinate leads to a win or a draw
-            result = game_logic()
-            if result[0] is True and result[1] != "":  # opponent win
-                opponent_details["score"] = opponent_details["score"] + 1
-                if result[1] == opponent_details["symbol"]:  #
-                    lbl_status["text"] = "Game over, You Lost! You(" + str(your_details["score"]) + ") - " \
-                        "" + opponent_details["name"] + "(" + str(opponent_details["score"]) + ")"
-                    lbl_status.config(foreground="red")
-                    threading._start_new_thread(init, ("", ""))
-            elif result[0] is True and result[1] == "":  # a draw
-                lbl_status["text"] = "Game over, Draw! You(" + str(your_details["score"]) + ") - " \
-                    "" + opponent_details["name"] + "(" + str(opponent_details["score"]) + ")"
-                lbl_status.config(foreground="blue")
-                threading._start_new_thread(init, ("", ""))
-            else:
-                your_turn = True
-                lbl_status["text"] = "STATUS: Your turn!"
-                lbl_status.config(foreground="black")
+            # # update board
+            # label_index = int(_x) * num_cols + int(_y)
+            # label = list_labels[label_index]
+            # label["symbol"] = opponent_details["symbol"]
+            # label["label"]["text"] = opponent_details["symbol"]
+            # label["label"].config(foreground=opponent_details["color"])
+            # label["ticked"] = True
+            #
+            # # Does this cordinate leads to a win or a draw
+            # result = game_logic()
+            # if result[0] is True and result[1] != "":  # opponent win
+            #     opponent_details["score"] = opponent_details["score"] + 1
+            #     if result[1] == opponent_details["symbol"]:  #
+            #         lbl_status["text"] = "Game over, You Lost! You(" + str(your_details["score"]) + ") - " \
+            #             "" + opponent_details["name"] + "(" + str(opponent_details["score"]) + ")"
+            #         lbl_status.config(foreground="red")
+            #         threading._start_new_thread(init, ("", ""))
+            # elif result[0] is True and result[1] == "":  # a draw
+            #     lbl_status["text"] = "Game over, Draw! You(" + str(your_details["score"]) + ") - " \
+            #         "" + opponent_details["name"] + "(" + str(opponent_details["score"]) + ")"
+            #     lbl_status.config(foreground="blue")
+            #     threading._start_new_thread(init, ("", ""))
+            # else:
+            #     your_turn = True
+            #     lbl_status["text"] = "STATUS: Your turn!"
+            #     lbl_status.config(foreground="black")
 
     client_socket.close()
 
@@ -234,13 +252,15 @@ def get_cordinate(xy):
             if result[0] is True and result[1] != "":  # a win
                 your_details["score"] = your_details["score"] + 1
                 lbl_status["text"] = "Game over, You won! You(" + str(your_details["score"]) + ") - " \
-                    "" + opponent_details["name"] + "(" + str(opponent_details["score"])+")"
+                                                                                               "" + opponent_details["name"] + "(" + str(
+                    opponent_details["score"]) + ")"
                 lbl_status.config(foreground="green")
                 threading._start_new_thread(init, ("", ""))
 
             elif result[0] is True and result[1] == "":  # a draw
                 lbl_status["text"] = "Game over, Draw! You(" + str(your_details["score"]) + ") - " \
-                    "" + opponent_details["name"] + "(" + str(opponent_details["score"]) + ")"
+                                                                                            "" + opponent_details["name"] + "(" + str(
+                    opponent_details["score"]) + ")"
                 lbl_status.config(foreground="blue")
                 threading._start_new_thread(init, ("", ""))
 
@@ -251,6 +271,7 @@ def get_cordinate(xy):
         lbl_status.config(foreground="red")
 
         # send xy coordinate to server to server
+
 
 def check_row():
     list_symbols = []
@@ -351,6 +372,7 @@ def check_draw():
             return [False, ""]
     return [True, ""]
 
+
 def game_logic():
     result = check_row()
     if result[0]:
@@ -367,15 +389,16 @@ def game_logic():
     result = check_draw()
     return result
 
-#def start_the_game(player_id, room_id):
+
+# def start_the_game(player_id, room_id):
 def start_the_game():
     room_id = "60c64517b9f846397cfb66ae"
     player_id = "60c3d0ae531e2ceec167b23a"
-    #u2_id = ""
-    #player_id = "60c3d13127d155fbbdb05592"
+    # player_id = "60c3d13127d155fbbdb05592"
 
     game_data = {"player_id": player_id, "room_id": room_id}
     connect_to_server(game_data)
+
 
 start_the_game()
 window.mainloop()

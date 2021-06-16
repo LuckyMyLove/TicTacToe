@@ -134,6 +134,7 @@ def receive_message_from_server(client_socket, m):
 
         if msg["command"].startswith("welcome"):
             your_details["symbol"] = msg["your_symbol"]
+            your_details["name"] = msg["your_nick"]
 
             if your_details["symbol"] == "X":
                 opponent_details["symbol"] = "O"
@@ -168,28 +169,15 @@ def receive_message_from_server(client_socket, m):
             update_board(msg["updated_board"])
 
 
-
-
-        elif msg["command"] == "opponent_name":
-            opponent_details["name"] = msg["opponent_nick"]
-            your_details["symbol"] = msg["your_symbol"]
-
-            # set opponent symbol
-            if your_details["symbol"] == "X":
-                opponent_details["symbol"] = "O"
-            else:
-                opponent_details["symbol"] = "X"
-
+        elif msg["command"] == "first_game_start":
             lbl_status["text"] = "STATUS: " + opponent_details["name"] + " is connected!"
             sleep(3)
-            # is it your turn to play? hey! 'O' comes before 'X'
-            if your_details["symbol"] == msg["current_turn"]:
+
+            if your_turn == True:
                 lbl_status["text"] = "STATUS: Your turn! (" + your_details["symbol"] + ")"
-                your_turn = True
 
             else:
                 lbl_status["text"] = "STATUS: " + opponent_details["name"] + "'s turn! (" + opponent_details["symbol"] + ")"
-                your_turn = False
 
 
         elif msg["command"] == "new_move":

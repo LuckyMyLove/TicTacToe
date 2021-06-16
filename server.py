@@ -91,6 +91,12 @@ def send_receive_client_message(client_connection, client_ip_addr):
         current_game_threads[1].send(json.dumps({"command":"welcome_second_player", "updated_board": current_game_board, "current_turn": current_turn,
                                            "your_symbol": your_symbol, "your_nick": your_nick, "opponent_nick": opponent_nick}).encode(FORMAT))
 
+    #sending info that we can start
+    if len(current_game_threads) > 1 and len(current_game_board) == 0:
+        current_game_threads[0].send(
+            json.dumps({"command": "first_game_start"}).encode(FORMAT))
+        current_game_threads[1].send(
+            json.dumps({"command": "first_game_start"}).encode(FORMAT))
 
     while True:
         # get the player choice from received data

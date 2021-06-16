@@ -123,7 +123,7 @@ class Tic_Tac_Toe():
         else:
             new_room = {"u1_id": users_data.find_one({"username": self.nick.get()})["_id"], "u2_id": "",
                         "room_name": self.new_room_name.get(), "symbol_u1": "X", "symbol_u2": "O", "moves": [],
-                        "current_turn": users_data.find_one({"username": self.nick.get()})["_id"],"is_finished": 0}
+                        "current_turn": "X", "is_finished": 0, "winner": ""}
             game_data.insert_one(new_room)
             self.generate_rooms()
             self.enter_room(game_data.find_one({"u1_id": new_room["u1_id"]})["_id"])

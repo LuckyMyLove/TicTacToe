@@ -34,22 +34,6 @@ def start_server():
         threading._start_new_thread(send_receive_client_message, (client_socket, ip))
 
 
-def get_current_players(current_room_id, current_player_id):
-    global all_players
-
-    if not any(current_room_id in room_id for room_id in all_players):
-        all_players.append({current_room_id: [current_player_id]})
-
-    for game in all_players:
-        if current_room_id in game:
-            current_players = game[current_room_id]
-
-    if current_player_id not in current_players and len(current_players) < 2:
-        current_players.append(current_player_id)
-
-    return current_players
-
-
 def get_current_game_threads(current_room_id, client_connection):
     global all_clients_threads
 
@@ -81,30 +65,32 @@ def send_receive_client_message(client_connection, client_ip_addr):
 
     game_info = game_data.find_one({"_id": ObjectId(current_room_id)})
     player1_nick = users_data.find_one({"_id": ObjectId(game_info["u1_id"])})["username"]
-
-    if current_player_id != game_data.find_one({"_id": ObjectId(current_room_id)})["u1_id"]:
+    you_are_u1 = False
+    #if we are the second player - update database
+    if ObjectId(current_player_id) != game_info["u1_id"]:
         game_data.update_one({"_id": "room_id"}, {"$set": {"id_u2": current_player_id}})
+    else:
+        you_are_u1 = True
 
-    player2_nick = users_data.find_one({"_id": ObjectId(game_info["u2_id"])})["username"]
+    player2_nick = users_data.find_one({"_id": game_info["u2_id"]})["username"]
+
+    your_symbol = "X" if ObjectId(current_player_id) == game_info["u1_id"] else "O"
+    your_nick = player1_nick if you_are_u1 else player2_nick
+    opponent_nick = player2_nick if your_nick == player1_nick else player1_nick
 
     ######################################
-    current_players = get_current_players(current_room_id, current_player_id)
     current_game_threads = get_current_game_threads(current_room_id, client_connection)
+    current_turn = game_info["current_turn"]
     current_game_board = game_data.find_one({"_id": ObjectId(current_room_id)})["moves"]
 
-    if len(current_players) < 2:
-        client_connection.send(json.dumps({"command":"welcome_first_player", "updated_board": current_game_board}).encode(FORMAT))
+    #one of the possible starts for player
+    if len(current_game_threads) < 2:
+        current_game_threads[0].send(json.dumps({"command":"welcome_first_player", "updated_board": current_game_board, "current_turn": current_turn,
+                                           "your_symbol": your_symbol, "your_nick": your_nick, "opponent_nick": opponent_nick}).encode(FORMAT))
     else:
-        client_connection.send(json.dumps({"command":"welcome_second_player", "updated_board": current_game_board}).encode(FORMAT))
+        current_game_threads[1].send(json.dumps({"command":"welcome_second_player", "updated_board": current_game_board, "current_turn": current_turn,
+                                           "your_symbol": your_symbol, "your_nick": your_nick, "opponent_nick": opponent_nick}).encode(FORMAT))
 
-    #################################################
-    if len(current_players) > 1:
-        sleep(1)
-        # current_game_threads[0].send(("opponent_name$" + player2_nick + "symbol" + symbols[1]).encode(FORMAT))
-        # current_game_threads[1].send(("opponent_name$" + player1_nick + "symbol" + symbols[0]).encode(FORMAT))
-
-        current_game_threads[0].send(json.dumps({"command":"opponent_name", "enemy_nick": player2_nick, "your_symbol": "X"}).encode(FORMAT))
-        current_game_threads[1].send(json.dumps({"command":"opponent_name", "enemy_nick": player1_nick, "your_symbol": "O"}).encode(FORMAT))
 
     while True:
         # get the player choice from received data
@@ -113,31 +99,36 @@ def send_receive_client_message(client_connection, client_ip_addr):
         msg = json.loads(data)
         # player x,y coordinate data. forward to the other player
         if msg["command"] == "new_move":
-            # is the message from client1 or client2?
+
+            # changing turn if last moved symbol is different
+            current_turn = game_data.find_one({"_id": ObjectId(current_room_id)})["current_turn"]
+
+            if msg["next_turn_symbol"] != current_turn:
+                current_turn = msg["next_turn_symbol"]
+                game_data.update_one({"_id": ObjectId(current_room_id)}, {"$set": {"current_turn": current_turn}})
+
+            #updating the board
             if len(msg["updated_board"]) > len(current_game_board):
-                game_data.update_one({"_id": ObjectId(current_room_id)}, {"$set": {"moves": current_game_board}})
+                game_data.update_one({"_id": ObjectId(current_room_id)}, {"$set": {"moves": msg["updated_board"]}})
                 current_game_board = msg["updated_board"]
             else:
                 current_game_board = game_data.find_one({"_id": ObjectId(current_room_id)})["moves"]
 
+            #sending data to both clients
             if client_connection == current_game_threads[0]:
-                # send the data from this player (client) to the other player (client)
-                current_game_threads[1].send(json.dumps({"command":"new_move", "updated_board": current_game_board}).encode(FORMAT))
+                current_game_threads[1].send(json.dumps({"command":"new_move", "updated_board": current_game_board, "current_turn": current_turn}).encode(FORMAT))
             else:
-                # send the data from this player (client) to the other player (client)
-                current_game_threads[0].send(json.dumps({"command":"new_move", "updated_board": current_game_board}).encode(FORMAT))
+                current_game_threads[0].send(json.dumps({"command":"new_move", "updated_board": current_game_board, "current_turn": current_turn}).encode(FORMAT))
 
     #sprawdzić na koniec czy wszystko poprawnie usuwa
     #all_clients_threads.remove(client_connection)
-    print("all_clients BEFORE remove:", all_clients)
-    all_clients.remove(client_connection)
-    print("all_clients AFTER remove:", all_clients, '\n')
-    print("current_game BEFORE remove:", current_players)
-    current_players.remove(current_player_id)
-    print("current_game AFTER remove:", current_players, '\n')
     print("current_game_threads BEFORE remove:", current_game_threads)
     current_game_threads.remove(client_connection)
     print("current_game_threads AFTER remove:", current_game_threads, '\n')
+
+    print("all_clients BEFORE remove:", all_clients)
+    all_clients.remove(client_connection)
+    print("all_clients AFTER remove:", all_clients, '\n')
     client_connection.close()
 
 

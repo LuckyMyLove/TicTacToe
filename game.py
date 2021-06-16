@@ -16,7 +16,6 @@ list_labels = []
 board_checked_fields = []
 num_cols = 3
 your_turn = False
-you_started = False
 
 your_details = {
     "name": "Charles",
@@ -79,14 +78,20 @@ for i in range(3):
 def click(row, col):
     global your_turn, board_checked_fields
     if your_turn == True:
+        new_move = {"row": row, "col": col, "symbol": your_details["symbol"]}
+
         if board_checked_fields == []:
-            board_checked_fields = [{"row": row, "col": col, "symbol": your_details["symbol"]}]
+            board_checked_fields = [new_move]
         else:
-            board_checked_fields.append({"row": row, "col": col, "symbol": your_details["symbol"]})
+            board_checked_fields.append(new_move)
+
         buttonsList[row][col].config(text=your_details["symbol"], state=DISABLED, disabledforeground=your_details["color"])
-        client.send(json.dumps({"command": "new_move", "updated_board": board_checked_fields}).encode(FORMAT))
         your_turn = False
-        lbl_status["text"] = "STATUS: " + opponent_details["name"] + "'s turn!"
+
+        #check_result()
+
+        client.send(json.dumps({"command": "new_move", "updated_board": board_checked_fields, "next_turn_symbol": opponent_details["symbol"]}).encode(FORMAT))
+        lbl_status["text"] = "STATUS: " + opponent_details["name"] + "'s turn! (" + opponent_details["symbol"] + ")"
 
     # check()  # wysłanie informacji na server
     # changePlayer()
@@ -96,8 +101,6 @@ def update_board(updated_board):
     global your_turn, your_details, board_checked_fields
     if len(updated_board) > len(board_checked_fields):
         board_checked_fields = updated_board
-        your_turn = True
-        lbl_status["text"] = "STATUS: Your turn! (" + your_details["symbol"] + ")"
 
     for single_move in board_checked_fields:
         color = your_details["color"] if single_move["symbol"] == your_details["symbol"] else opponent_details["color"]
@@ -121,58 +124,54 @@ def connect_to_server(game_data):
         #     PORT) + " Server may be Unavailable. Try again later")
 
 
-def init():
-    global list_labels, your_turn, your_details, opponent_details, you_started
-
-    sleep(3)
-
-    for i in range(len(list_labels)):
-        list_labels[i]["symbol"] = ""
-        list_labels[i]["ticked"] = False
-        list_labels[i]["label"]["text"] = ""
-        list_labels[i]["label"].config(foreground="black", highlightbackground="grey",
-                                       highlightcolor="grey", highlightthickness=1)
-
-    lbl_status.config(foreground="black")
-    lbl_status["text"] = "STATUS: Game's starting."
-    sleep(1)
-    lbl_status["text"] = "STATUS: Game's starting.."
-    sleep(1)
-    lbl_status["text"] = "STATUS: Game's starting..."
-    sleep(1)
-
-    if you_started:
-        you_started = False
-        your_turn = False
-        lbl_status["text"] = "STATUS: " + opponent_details["name"] + "'s turn! (" + opponent_details["symbol"] + ")"
-    else:
-        you_started = True
-        your_turn = True
-        lbl_status["text"] = "STATUS: Your turn! (" + your_details["symbol"] + ")"
-
-
 def receive_message_from_server(client_socket, m):
-    global your_details, opponent_details, your_turn, you_started
+    global your_details, opponent_details, your_turn
     while True:
         from_server = client_socket.recv(4096).decode(FORMAT)
         if not from_server: break
 
         msg = json.loads(from_server)
 
-        if msg["command"] == "welcome_first_player":
-            your_details["color"] = "firebrick3"
-            opponent_details["color"] = "Dodgerblue2"
-            lbl_status["text"] = "Server: Welcome " + your_details["name"] + "! Waiting for second player"
+        if msg["command"].startswith("welcome"):
+            your_details["symbol"] = msg["your_symbol"]
+
+            if your_details["symbol"] == "X":
+                opponent_details["symbol"] = "O"
+            else:
+                opponent_details["symbol"] = "X"
+
+            if msg["opponent_nick"] != "":
+                opponent_details["name"] = msg["opponent_nick"]
+
+            #if it's continuation of the game
+            if msg["current_turn"] == your_details["symbol"]:
+                your_turn = True
+                if len(msg["updated_board"]) > 0:
+                    lbl_status["text"] = "STATUS: Your turn! (" + your_details["symbol"] + ")"
+            else:
+                your_turn = False
+                if len(msg["updated_board"]) > 0:
+                    lbl_status["text"] = "STATUS: " + opponent_details["name"] + "'s turn! (" + opponent_details["symbol"] + ")"
+
+            if msg["command"] == "welcome_first_player":
+                your_details["color"] = "firebrick3"
+                opponent_details["color"] = "Dodgerblue2"
+                if len(msg["updated_board"]) == 0:
+                    lbl_status["text"] = "Server: Welcome " + your_details["name"] + "! Waiting for second player"
+
+            elif msg["command"] == "welcome_second_player":
+                your_details["color"] = "Dodgerblue2"
+                opponent_details["color"] = "firebrick3"
+                if len(msg["updated_board"]) == 0:
+                    lbl_status["text"] = "Server: Welcome " + your_details["name"] + "! Game will start soon"
+
             update_board(msg["updated_board"])
 
-        elif msg["command"] == "welcome_second_player":
-            lbl_status["text"] = "Server: Welcome " + your_details["name"] + "! Game will start soon"
-            your_details["color"] = "Dodgerblue2"
-            opponent_details["color"] = "firebrick3"
-            update_board(msg["updated_board"])
+
+
 
         elif msg["command"] == "opponent_name":
-            opponent_details["name"] = msg["enemy_nick"]
+            opponent_details["name"] = msg["opponent_nick"]
             your_details["symbol"] = msg["your_symbol"]
 
             # set opponent symbol
@@ -184,210 +183,22 @@ def receive_message_from_server(client_socket, m):
             lbl_status["text"] = "STATUS: " + opponent_details["name"] + " is connected!"
             sleep(3)
             # is it your turn to play? hey! 'O' comes before 'X'
-            if your_details["symbol"] == "X":
+            if your_details["symbol"] == msg["current_turn"]:
                 lbl_status["text"] = "STATUS: Your turn! (" + your_details["symbol"] + ")"
                 your_turn = True
-                you_started = True
 
             else:
                 lbl_status["text"] = "STATUS: " + opponent_details["name"] + "'s turn! (" + opponent_details["symbol"] + ")"
-                you_started = False
                 your_turn = False
+
 
         elif msg["command"] == "new_move":
             update_board(msg["updated_board"])
 
-            # temp = from_server.replace("$xy$", "")
-            # _x = temp[0:temp.find("$")]
-            # _y = temp[temp.find("$") + 1:len(temp)]
-
-            # # update board
-            # label_index = int(_x) * num_cols + int(_y)
-            # label = list_labels[label_index]
-            # label["symbol"] = opponent_details["symbol"]
-            # label["label"]["text"] = opponent_details["symbol"]
-            # label["label"].config(foreground=opponent_details["color"])
-            # label["ticked"] = True
-            #
-            # # Does this cordinate leads to a win or a draw
-            # result = game_logic()
-            # if result[0] is True and result[1] != "":  # opponent win
-            #     opponent_details["score"] = opponent_details["score"] + 1
-            #     if result[1] == opponent_details["symbol"]:  #
-            #         lbl_status["text"] = "Game over, You Lost! You(" + str(your_details["score"]) + ") - " \
-            #             "" + opponent_details["name"] + "(" + str(opponent_details["score"]) + ")"
-            #         lbl_status.config(foreground="red")
-            #         threading._start_new_thread(init, ("", ""))
-            # elif result[0] is True and result[1] == "":  # a draw
-            #     lbl_status["text"] = "Game over, Draw! You(" + str(your_details["score"]) + ") - " \
-            #         "" + opponent_details["name"] + "(" + str(opponent_details["score"]) + ")"
-            #     lbl_status.config(foreground="blue")
-            #     threading._start_new_thread(init, ("", ""))
-            # else:
-            #     your_turn = True
-            #     lbl_status["text"] = "STATUS: Your turn!"
-            #     lbl_status.config(foreground="black")
+            if msg["current_turn"] == your_details["symbol"]:
+                your_turn = True
 
     client_socket.close()
-
-
-def get_cordinate(xy):
-    global client, your_turn
-    # convert 2D to 1D cordinate i.e. index = x * num_cols + y
-    label_index = xy[0] * num_cols + xy[1]
-    label = list_labels[label_index]
-
-    if your_turn:
-        if label["ticked"] is False:
-            label["label"].config(foreground=your_details["color"])
-            label["label"]["text"] = your_details["symbol"]
-            label["ticked"] = True
-            label["symbol"] = your_details["symbol"]
-            # send xy cordinate to server
-            client.send(("$xy$" + str(xy[0]) + "$" + str(xy[1])).encode(FORMAT))
-            your_turn = False
-
-            # Does this play leads to a win or a draw
-            result = game_logic()
-            if result[0] is True and result[1] != "":  # a win
-                your_details["score"] = your_details["score"] + 1
-                lbl_status["text"] = "Game over, You won! You(" + str(your_details["score"]) + ") - " \
-                                                                                               "" + opponent_details["name"] + "(" + str(
-                    opponent_details["score"]) + ")"
-                lbl_status.config(foreground="green")
-                threading._start_new_thread(init, ("", ""))
-
-            elif result[0] is True and result[1] == "":  # a draw
-                lbl_status["text"] = "Game over, Draw! You(" + str(your_details["score"]) + ") - " \
-                                                                                            "" + opponent_details["name"] + "(" + str(
-                    opponent_details["score"]) + ")"
-                lbl_status.config(foreground="blue")
-                threading._start_new_thread(init, ("", ""))
-
-            else:
-                lbl_status["text"] = "STATUS: " + opponent_details["name"] + "'s turn!"
-    else:
-        lbl_status["text"] = "STATUS: Wait for your turn!"
-        lbl_status.config(foreground="red")
-
-        # send xy coordinate to server to server
-
-
-def check_row():
-    list_symbols = []
-    list_labels_temp = []
-    winner = False
-    win_symbol = ""
-    for i in range(len(list_labels)):
-        list_symbols.append(list_labels[i]["symbol"])
-        list_labels_temp.append(list_labels[i])
-        if (i + 1) % 3 == 0:
-            if (list_symbols[0] == list_symbols[1] == list_symbols[2]):
-                if list_symbols[0] != "":
-                    winner = True
-                    win_symbol = list_symbols[0]
-
-                    list_labels_temp[0]["label"].config(foreground="green", highlightbackground="green",
-                                                        highlightcolor="green", highlightthickness=2)
-                    list_labels_temp[1]["label"].config(foreground="green", highlightbackground="green",
-                                                        highlightcolor="green", highlightthickness=2)
-                    list_labels_temp[2]["label"].config(foreground="green", highlightbackground="green",
-                                                        highlightcolor="green", highlightthickness=2)
-
-            list_symbols = []
-            list_labels_temp = []
-
-    return [winner, win_symbol]
-
-
-# [(0,0) -> (1,0) -> (2,0)], [(0,1) -> (1,1) -> (2,1)], [(0,2), (1,2), (2,2)]
-def check_col():
-    winner = False
-    win_symbol = ""
-    for i in range(num_cols):
-        if list_labels[i]["symbol"] == list_labels[i + num_cols]["symbol"] == list_labels[i + num_cols + num_cols][
-            "symbol"]:
-            if list_labels[i]["symbol"] != "":
-                winner = True
-                win_symbol = list_labels[i]["symbol"]
-
-                list_labels[i]["label"].config(foreground="green", highlightbackground="green",
-                                               highlightcolor="green", highlightthickness=2)
-                list_labels[i + num_cols]["label"].config(foreground="green", highlightbackground="green",
-                                                          highlightcolor="green", highlightthickness=2)
-                list_labels[i + num_cols + num_cols]["label"].config(foreground="green", highlightbackground="green",
-                                                                     highlightcolor="green", highlightthickness=2)
-
-    return [winner, win_symbol]
-
-
-def check_diagonal():
-    winner = False
-    win_symbol = ""
-    i = 0
-    j = 2
-
-    # top-left to bottom-right diagonal (0, 0) -> (1,1) -> (2, 2)
-    a = list_labels[i]["symbol"]
-    b = list_labels[i + (num_cols + 1)]["symbol"]
-    c = list_labels[(num_cols + num_cols) + (i + 1)]["symbol"]
-    if list_labels[i]["symbol"] == list_labels[i + (num_cols + 1)]["symbol"] == \
-            list_labels[(num_cols + num_cols) + (i + 2)]["symbol"]:
-        if list_labels[i]["symbol"] != "":
-            winner = True
-            win_symbol = list_labels[i]["symbol"]
-
-            list_labels[i]["label"].config(foreground="green", highlightbackground="green",
-                                           highlightcolor="green", highlightthickness=2)
-
-            list_labels[i + (num_cols + 1)]["label"].config(foreground="green", highlightbackground="green",
-                                                            highlightcolor="green", highlightthickness=2)
-            list_labels[(num_cols + num_cols) + (i + 2)]["label"].config(foreground="green",
-                                                                         highlightbackground="green",
-                                                                         highlightcolor="green", highlightthickness=2)
-
-    # top-right to bottom-left diagonal (0, 0) -> (1,1) -> (2, 2)
-    elif list_labels[j]["symbol"] == list_labels[j + (num_cols - 1)]["symbol"] == list_labels[j + (num_cols + 1)][
-        "symbol"]:
-        if list_labels[j]["symbol"] != "":
-            winner = True
-            win_symbol = list_labels[j]["symbol"]
-
-            list_labels[j]["label"].config(foreground="green", highlightbackground="green",
-                                           highlightcolor="green", highlightthickness=2)
-            list_labels[j + (num_cols - 1)]["label"].config(foreground="green", highlightbackground="green",
-                                                            highlightcolor="green", highlightthickness=2)
-            list_labels[j + (num_cols + 1)]["label"].config(foreground="green", highlightbackground="green",
-                                                            highlightcolor="green", highlightthickness=2)
-    else:
-        winner = False
-
-    return [winner, win_symbol]
-
-
-# it's a draw if grid is filled
-def check_draw():
-    for i in range(len(list_labels)):
-        if list_labels[i]["ticked"] is False:
-            return [False, ""]
-    return [True, ""]
-
-
-def game_logic():
-    result = check_row()
-    if result[0]:
-        return result
-
-    result = check_col()
-    if result[0]:
-        return result
-
-    result = check_diagonal()
-    if result[0]:
-        return result
-
-    result = check_draw()
-    return result
 
 
 # def start_the_game(player_id, room_id):

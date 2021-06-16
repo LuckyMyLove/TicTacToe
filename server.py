@@ -105,7 +105,6 @@ def send_receive_client_message(client_connection, client_ip_addr):
         msg = json.loads(data)
         # player x,y coordinate data. forward to the other player
         if msg["command"] == "new_move":
-
             # changing turn if last moved symbol is different
             current_turn = game_data.find_one({"_id": ObjectId(current_room_id)})["current_turn"]
 
@@ -126,15 +125,38 @@ def send_receive_client_message(client_connection, client_ip_addr):
             else:
                 current_game_threads[0].send(json.dumps({"command":"new_move", "updated_board": current_game_board, "current_turn": current_turn}).encode(FORMAT))
 
-    #sprawdzić na koniec czy wszystko poprawnie usuwa
-    #all_clients_threads.remove(client_connection)
-    print("current_game_threads BEFORE remove:", current_game_threads)
-    current_game_threads.remove(client_connection)
-    print("current_game_threads AFTER remove:", current_game_threads, '\n')
+        if msg["command"] == "game_won":
+            game_data.update_one({"_id": ObjectId(current_room_id)}, {"$set": {"is_finished": 1, "winner": msg["winner_symbol"]}})
 
-    print("all_clients BEFORE remove:", all_clients)
+            winner_id = game_info["u1_id"] if msg["winner_symbol"] == "X" else game_info["u2_id"]
+            current_winner_points = users_data.find_one({"_id": winner_id})["points"]
+            users_data.update_one({"_id": winner_id}, {"$set": {"points": current_winner_points+200}})
+
+            winner_nick = your_nick if winner_id == ObjectId(current_player_id) else opponent_nick
+            current_game_threads[0].send(json.dumps({"command":"game_won", "winner_nick": winner_nick}).encode(FORMAT))
+            if len(current_game_threads) > 1:
+                current_game_threads[1].send(json.dumps({"command":"game_won", "winner_nick": winner_nick}).encode(FORMAT))
+
+        if msg["command"] == "draw":
+            game_data.update_one({"_id": ObjectId(current_room_id)}, {"$set": {"is_finished": 1, "winner": "draw"}})
+
+            winner_points = users_data.find_one({"_id": game_info["u1_id"]})["points"]
+            users_data.update_one({"_id": game_info["u1_id"]}, {"$set": {"points": winner_points + 100}})
+
+            winner_points = users_data.find_one({"_id": game_info["u2_id"]})["points"]
+            users_data.update_one({"_id": game_info["u2_id"]}, {"$set": {"points": winner_points + 100}})
+
+            current_game_threads[0].send(json.dumps({"command":"draw"}).encode(FORMAT))
+            if len(current_game_threads) > 1:
+                current_game_threads[1].send(json.dumps({"command":"draw"}).encode(FORMAT))
+
+        if msg["command"] == "!DISCONNECT":
+            break
+
+
+
+    current_game_threads.remove(client_connection)
     all_clients.remove(client_connection)
-    print("all_clients AFTER remove:", all_clients, '\n')
     client_connection.close()
 
 

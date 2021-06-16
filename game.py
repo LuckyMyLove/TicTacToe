@@ -12,7 +12,6 @@ SERVER = '127.0.0.1'
 PORT = 5050
 FORMAT = 'utf-8'
 
-list_labels = []
 board_checked_fields = []
 num_cols = 3
 your_turn = False
@@ -75,6 +74,27 @@ for i in range(3):
         buttonsList[i][j].grid(row=i, column=j)
 
 
+def check():  # Checks for victory or Draw
+    global your_details
+    for i in range(3):
+        if (buttonsList[i][0]["text"] == buttonsList[i][1]["text"] == buttonsList[i][2]["text"] ==
+                your_details["symbol"] or buttonsList[0][i]["text"] == buttonsList[1][i]["text"] ==
+                buttonsList[2][i]["text"] == your_details["symbol"]):
+            client.send(json.dumps({"command": "game_won", "winner_symbol": your_details["symbol"]}).encode(FORMAT))
+
+    if (buttonsList[0][0]["text"] == buttonsList[1][1]["text"] == buttonsList[2][2]["text"] == your_details[
+        "symbol"] or buttonsList[0][2]["text"] == buttonsList[1][1]["text"] == buttonsList[2][0]["text"] ==
+            your_details["symbol"]):
+        client.send(json.dumps({"command": "game_won", "winner_symbol": your_details["symbol"]}).encode(FORMAT))
+
+    # DRAW
+    elif (buttonsList[0][0]["state"] == buttonsList[0][1]["state"] == buttonsList[0][2]["state"] ==
+          buttonsList[1][0]["state"] == buttonsList[1][1]["state"] == buttonsList[1][2]["state"] ==
+          buttonsList[2][0]["state"] == buttonsList[2][1]["state"] == buttonsList[2][2][
+              "state"] == DISABLED):
+        client.send(json.dumps({"command": "draw"}).encode(FORMAT))
+
+
 def click(row, col):
     global your_turn, board_checked_fields
     if your_turn == True:
@@ -88,13 +108,11 @@ def click(row, col):
         buttonsList[row][col].config(text=your_details["symbol"], state=DISABLED, disabledforeground=your_details["color"])
         your_turn = False
 
-        #check_result()
-
-        client.send(json.dumps({"command": "new_move", "updated_board": board_checked_fields, "next_turn_symbol": opponent_details["symbol"]}).encode(FORMAT))
+        client.send(json.dumps(
+            {"command": "new_move", "updated_board": board_checked_fields, "next_turn_symbol": opponent_details["symbol"]}).encode(FORMAT))
         lbl_status["text"] = "STATUS: " + opponent_details["name"] + "'s turn! (" + opponent_details["symbol"] + ")"
 
-    # check()  # wysłanie informacji na server
-    # changePlayer()
+        check()
 
 
 def update_board(updated_board):
@@ -144,7 +162,7 @@ def receive_message_from_server(client_socket, m):
             if msg["opponent_nick"] != "":
                 opponent_details["name"] = msg["opponent_nick"]
 
-            #if it's continuation of the game
+            # if it's continuation of the game
             if msg["current_turn"] == your_details["symbol"]:
                 your_turn = True
                 if len(msg["updated_board"]) > 0:
@@ -179,12 +197,28 @@ def receive_message_from_server(client_socket, m):
             else:
                 lbl_status["text"] = "STATUS: " + opponent_details["name"] + "'s turn! (" + opponent_details["symbol"] + ")"
 
-
         elif msg["command"] == "new_move":
             update_board(msg["updated_board"])
 
             if msg["current_turn"] == your_details["symbol"]:
                 your_turn = True
+                lbl_status["text"] = "STATUS: Your turn! (" + your_details["symbol"] + ")"
+            else:
+                lbl_status["text"] = "STATUS: " + opponent_details["name"] + "'s turn! (" + opponent_details["symbol"] + ")"
+
+        elif msg["command"] == "game_won":
+            your_turn = False
+            lbl_status["text"] = "GAME OVER! The winner is " + msg["winner_nick"] + "!"
+
+            if msg["winner_nick"] == your_details["name"]:
+                lbl_status["text"].config(foreground=your_details["color"])
+            else:
+                lbl_status.config(foreground=opponent_details["color"])
+
+        elif msg["command"] == "draw":
+            your_turn = False
+            lbl_status["text"] = "GAME OVER! It's a DRAW!"
+            lbl_status.config(foreground=your_details["color"])
 
     client_socket.close()
 
@@ -193,11 +227,19 @@ def receive_message_from_server(client_socket, m):
 def start_the_game():
     room_id = "60c64517b9f846397cfb66ae"
     player_id = "60c3d0ae531e2ceec167b23a"
-    # player_id = "60c3d13127d155fbbdb05592"
+    #player_id = "60c3d13127d155fbbdb05592"
 
     game_data = {"player_id": player_id, "room_id": room_id}
     connect_to_server(game_data)
 
 
+def on_closing():
+    client.send(json.dumps({"command": "!DISCONNECT"}).encode(FORMAT))
+    window.destroy()
+    #if messagebox.askokcancel("Quit", "Do you want to quit?"):
+
+
+
 start_the_game()
+window.protocol("WM_DELETE_WINDOW", on_closing)
 window.mainloop()

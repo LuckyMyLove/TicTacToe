@@ -31,6 +31,7 @@ def start_server():
     while True:
         client_socket, ip = server.accept()
         all_clients.append(client_socket)
+        print("Server socket bound with with ip {} port {}".format(ip[0], ip[1]))
         threading._start_new_thread(send_receive_client_message, (client_socket, ip))
 
 
@@ -65,6 +66,7 @@ def send_receive_client_message(client_connection, client_ip_addr):
 
     game_info = game_data.find_one({"_id": ObjectId(current_room_id)})
     player1_nick = users_data.find_one({"_id": ObjectId(game_info["u1_id"])})["username"]
+
     you_are_u1 = False
     #if we are the second player - update database
     if ObjectId(current_player_id) != game_info["u1_id"]:
@@ -72,12 +74,14 @@ def send_receive_client_message(client_connection, client_ip_addr):
     else:
         you_are_u1 = True
 
-    player2_nick = users_data.find_one({"_id": game_info["u2_id"]})["username"]
+    player2_nick = users_data.find_one({"_id": game_info["u2_id"]})["username"] if game_data["u2_id"] else ""
 
-    your_symbol = "X" if ObjectId(current_player_id) == game_info["u1_id"] else "O"
+    # your_symbol = "X" if ObjectId(current_player_id) == game_info["u1_id"] else "O"
+    your_symbol = "X" if you_are_u1 else "O"
     your_nick = player1_nick if you_are_u1 else player2_nick
     opponent_nick = player2_nick if your_nick == player1_nick else player1_nick
-
+    your_score = users_data.find_one({"_id": ObjectId(current_player_id)})["points"]
+    opponent_score = users_data.find_one({"username": opponent_nick})["points"] if opponent_nick != "" else 0
     ######################################
     current_game_threads = get_current_game_threads(current_room_id, client_connection)
     current_turn = game_info["current_turn"]
@@ -86,10 +90,10 @@ def send_receive_client_message(client_connection, client_ip_addr):
     #one of the possible starts for player
     if len(current_game_threads) < 2:
         current_game_threads[0].send(json.dumps({"command":"welcome_first_player", "updated_board": current_game_board, "current_turn": current_turn,
-                                           "your_symbol": your_symbol, "your_nick": your_nick, "opponent_nick": opponent_nick}).encode(FORMAT))
+                                           "your_symbol": your_symbol, "your_nick": your_nick, "opponent_nick": opponent_nick, "your_score": your_score, "opponent_score": opponent_score}).encode(FORMAT))
     else:
         current_game_threads[1].send(json.dumps({"command":"welcome_second_player", "updated_board": current_game_board, "current_turn": current_turn,
-                                           "your_symbol": your_symbol, "your_nick": your_nick, "opponent_nick": opponent_nick}).encode(FORMAT))
+                                           "your_symbol": your_symbol, "your_nick": your_nick, "opponent_nick": opponent_nick, "your_score": your_score, "opponent_score": opponent_score}).encode(FORMAT))
 
     #sending info that we can start
     if len(current_game_threads) > 1 and len(current_game_board) == 0:
@@ -154,7 +158,7 @@ def send_receive_client_message(client_connection, client_ip_addr):
             break
 
 
-
+    print("{} has left the game".format(your_nick))
     current_game_threads.remove(client_connection)
     all_clients.remove(client_connection)
     client_connection.close()

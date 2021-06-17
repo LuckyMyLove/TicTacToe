@@ -9,6 +9,7 @@ class Tic_Tac_Toe():
     def __init__(self):
         self.window = Tk()
         self.window.title('Tic Tac Toe by Jędrzej Jagiełło')
+        self.window.resizable(False,False)
         self.window.geometry('{}x{}'.format(size_of_board, size_of_board))
 
         self.rooms_list = game_data.find()
@@ -130,4 +131,5 @@ class Tic_Tac_Toe():
 
 
 game_instance = Tic_Tac_Toe()
+game_instance.resizable(False, False)
 game_instance.mainloop()

@@ -17,14 +17,14 @@ num_cols = 3
 your_turn = False
 
 your_details = {
-    "name": "Charles",
+    "name": "Player1",
     "symbol": "X",
     "color": "",
     "score": 0
 }
 
 opponent_details = {
-    "name": " ",
+    "name": "Player2",
     "symbol": "O",
     "color": "",
     "score": 0
@@ -38,32 +38,24 @@ content.grid(row=0, column=0)
 
 gameInfo = ttk.Frame(content, width=600, height=150)
 gameBoard = ttk.Frame(content, borderwidth=5, relief="ridge", width=450, height=450)
-gamePoints = ttk.Frame(content, borderwidth=5, relief="ridge", width=150, height=50)
-gameHistory = ttk.Frame(content, borderwidth=5, relief="ridge", width=150, height=150)
+gamePoints = ttk.Frame(content, borderwidth=5, relief="ridge")
+gameHistory = ttk.Frame(content, borderwidth=5, relief="ridge")
 
 gameInfo.grid(column=0, row=0, columnspan=2)
 gameBoard.grid(column=0, row=1, rowspan=2)
 gamePoints.grid(column=1, row=1)
 gameHistory.grid(column=1, row=2)
 
-# self.chance_label = ttk.Label(self.gameInfo, text=self.symbol + "'s Chance").grid(row=0, pady="3")
-# ttk.Label(gameInfo, text='{} (X) VS {} (O)'.format(u1_nick, u2_nick), font=('arial', 15, 'bold')).grid(row=1, pady="3")
+
 lbl_status = ttk.Label(gameInfo, text="Status: Not connected to server", font="Helvetica 14 bold")
 lbl_status.grid(row=1, pady="3")
 
-ttk.Label(gamePoints, text="Score:").grid(row=1)
-# ttk.Label(gamePoints, text="{}: {}".format(your_details["name"], users_data.find_one({"username": your_details["name"]})["points"])).grid(
-#     row=2)
-# ttk.Label(gamePoints, text="{}: {}".format(opponent_details["name"], users_data.find_one({"username": opponent_details["name"]})["points"])).grid(
-#     row=2)
-ttk.Label(gamePoints, text="{}: {}".format(your_details["name"], "200")).grid(
-    row=2)
-ttk.Label(gamePoints, text="{}: {}".format(opponent_details["name"], "100")).grid(
-    row=2)
+player_scores = ttk.Label(gamePoints, text="Players scores:\n{}: {}\n{}: {}".format(your_details["name"], "200", opponent_details["name"], "100"), font=('consolas 8'), justify=CENTER)
+player_scores.grid(row=1)
 
-ttk.Label(gameHistory, text="Round history:").grid(row=1)
-ttk.Label(gameHistory, text="Player1: 1, 1").grid(row=2)
-ttk.Label(gameHistory, text="Player2: 3, 1").grid(row=3)
+moves_history = ttk.Label(gameHistory, text="Round history:\n...",font=('consolas 10'), justify=CENTER)
+moves_history.grid(row=1)
+
 
 buttonsList = [[], [], []]
 for i in range(3):
@@ -97,6 +89,7 @@ def check():  # Checks for victory or Draw
 
 def click(row, col):
     global your_turn, board_checked_fields
+
     if your_turn == True:
         new_move = {"row": row, "col": col, "symbol": your_details["symbol"]}
 
@@ -107,6 +100,9 @@ def click(row, col):
 
         buttonsList[row][col].config(text=your_details["symbol"], state=DISABLED, disabledforeground=your_details["color"])
         your_turn = False
+
+        moves_history["text"] = moves_history["text"].replace("\n...","")
+        moves_history["text"] = moves_history["text"] + "\n{} -> [{},{}]".format(your_details["symbol"], row, col)
 
         client.send(json.dumps(
             {"command": "new_move", "updated_board": board_checked_fields, "next_turn_symbol": opponent_details["symbol"]}).encode(FORMAT))
@@ -120,9 +116,16 @@ def update_board(updated_board):
     if len(updated_board) > len(board_checked_fields):
         board_checked_fields = updated_board
 
+
+    #update current board and update game history
+    moves_history["text"] = "Game history:" if len(updated_board) > 0 else "Game history:\n..."
     for single_move in board_checked_fields:
         color = your_details["color"] if single_move["symbol"] == your_details["symbol"] else opponent_details["color"]
         buttonsList[single_move["row"]][single_move["col"]].config(text=single_move["symbol"], state=DISABLED, disabledforeground=color)
+        moves_history["text"] = moves_history["text"] + "\n{} -> [{},{}]".format(single_move["symbol"], single_move["row"], single_move["col"])
+
+
+
 
 
 def connect_to_server(game_data):
@@ -153,14 +156,19 @@ def receive_message_from_server(client_socket, m):
         if msg["command"].startswith("welcome"):
             your_details["symbol"] = msg["your_symbol"]
             your_details["name"] = msg["your_nick"]
+            your_details["score"] = msg["your_score"]
 
             if your_details["symbol"] == "X":
                 opponent_details["symbol"] = "O"
             else:
                 opponent_details["symbol"] = "X"
 
+            player_scores["text"] = "Players scores:\n{}: {}".format(your_details["name"], your_details["score"])
             if msg["opponent_nick"] != "":
                 opponent_details["name"] = msg["opponent_nick"]
+                opponent_details["score"] = msg["opponent_score"]
+                player_scores["text"] = "Players scores:\n{}: {}\n{}: {}".format(your_details["name"], your_details["score"],
+                                                                                 opponent_details["name"], opponent_details["score"])
 
             # if it's continuation of the game
             if msg["current_turn"] == your_details["symbol"]:
@@ -208,10 +216,10 @@ def receive_message_from_server(client_socket, m):
 
         elif msg["command"] == "game_won":
             your_turn = False
-            lbl_status["text"] = "GAME OVER! The winner is " + msg["winner_nick"] + "!"
+            lbl_status["text"] = "GAME OVER! {} is the winner!".format(msg["winner_nick"])
 
-            if msg["winner_nick"] == your_details["name"]:
-                lbl_status["text"].config(foreground=your_details["color"])
+            if your_details["name"] == msg["winner_nick"]:
+                lbl_status.config(foreground=your_details["color"])
             else:
                 lbl_status.config(foreground=opponent_details["color"])
 
@@ -226,20 +234,20 @@ def receive_message_from_server(client_socket, m):
 # def start_the_game(player_id, room_id):
 def start_the_game():
     room_id = "60c64517b9f846397cfb66ae"
-    player_id = "60c3d0ae531e2ceec167b23a"
-    #player_id = "60c3d13127d155fbbdb05592"
+    #player_id = "60c3d0ae531e2ceec167b23a"
+    player_id = "60c3d13127d155fbbdb05592"
 
     game_data = {"player_id": player_id, "room_id": room_id}
     connect_to_server(game_data)
 
 
 def on_closing():
-    client.send(json.dumps({"command": "!DISCONNECT"}).encode(FORMAT))
-    window.destroy()
-    #if messagebox.askokcancel("Quit", "Do you want to quit?"):
-
+    if messagebox.askokcancel("Quit", "Do you want to quit?"):
+        window.destroy()
+        client.send(json.dumps({"command": "!DISCONNECT"}).encode(FORMAT))
 
 
 start_the_game()
 window.protocol("WM_DELETE_WINDOW", on_closing)
+window.resizable(False, False)
 window.mainloop()

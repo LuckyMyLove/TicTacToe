@@ -1,3 +1,5 @@
+from tkinter import *
+from tkinter import messagebox
 from game import *
 from db_connection import *
 
@@ -5,11 +7,11 @@ size_of_board = 600
 entry_width = 30
 
 
-class Tic_Tac_Toe():
+class lobby():
     def __init__(self):
         self.window = Tk()
         self.window.title('Tic Tac Toe by Jędrzej Jagiełło')
-        self.window.resizable(False,False)
+        self.window.resizable(False, False)
         self.window.geometry('{}x{}'.format(size_of_board, size_of_board))
 
         self.rooms_list = game_data.find()
@@ -69,25 +71,15 @@ class Tic_Tac_Toe():
 
         u1_id = current_room["u1_id"]
         u2_id = current_room["u2_id"]
-        print(u1_id)
 
-        if current_user_id == u1_id and u2_id == "":
-            start_the_game(current_user_id, '', room_id)
+        if current_room["is_finished"] == 1:
+            messagebox.showinfo("Error", "This game is already finished!")
 
-        elif current_user_id == u1_id and u2_id != "":
-            start_the_game(current_user_id, u2_id, room_id)
-
-        elif current_user_id != u1_id and u2_id == current_user_id:
-            game_data.update_one({"_id": "room_id"}, {"$set": {"id_u2": current_user_id}})
-            start_the_game(u1_id, current_user_id, room_id)
-
-        elif current_user_id != u1_id and u2_id == "":
-            game_data.update_one({"_id": "room_id"}, {"$set": {"id_u2": current_user_id}})
-            start_the_game(u1_id, current_user_id, room_id)
+        elif current_user_id == u1_id or current_user_id == u2_id or u2_id == "":
+            start_the_game(current_user_id, current_room["_id"])
 
         else:
             messagebox.showinfo("Error", "Second slot is already taken by another player")
-
 
     def generate_rooms(self):
         self.rooms_list = game_data.find()
@@ -105,7 +97,8 @@ class Tic_Tac_Toe():
                            command=lambda room_id=room['_id']: self.enter_room(room_id)).pack()
 
                 elif room["u2_id"] != "":
-                    room_text = str("# " + room["room_name"] + " / created by: " + room_creator + "\n" + room_creator + " vs " + users_data.find_one({'_id': room["u2_id"]})["username"])
+                    room_text = str("# " + room["room_name"] + " / created by: " + room_creator + "\n" + room_creator + " vs " +
+                                    users_data.find_one({'_id': room["u2_id"]})["username"])
                     Button(self.available_rooms, text=room_text, font=("Courier", 10), fg="firebrick3",
                            command=lambda room_id=room['_id']: self.enter_room(room_id)).pack()
 
@@ -115,8 +108,9 @@ class Tic_Tac_Toe():
                            command=lambda room_id=room['_id']: self.enter_room(room_id)).pack()
 
     def new_room(self):
-        if game_data.find_one({"room_name": self.new_room_name.get()}):
-            messagebox.showinfo('Duplicate room name', "There is already room with name like this in DB, please provide another one.")
+        does_room_exist = game_data.find_one({"room_name": self.new_room_name.get()})
+        if does_room_exist is not None and does_room_exist["is_finished"] == 0:
+            messagebox.showinfo('Duplicate room name', "There is already room with name like this, please provide another one.")
 
         elif self.new_room_name.get() == '' or str(self.new_room_name.get()).isspace():
             messagebox.showinfo('Error', "Please add room name which won't be only from whitespaces.")
@@ -127,9 +121,8 @@ class Tic_Tac_Toe():
                         "current_turn": "X", "is_finished": 0, "winner": ""}
             game_data.insert_one(new_room)
             self.generate_rooms()
-            self.enter_room(game_data.find_one({"u1_id": new_room["u1_id"]})["_id"])
+            self.enter_room(game_data.find_one({"room_name": new_room["room_name"], 'is_finished': 0})["_id"])
 
 
-game_instance = Tic_Tac_Toe()
-game_instance.resizable(False, False)
-game_instance.mainloop()
+lobby = lobby()
+lobby.mainloop()

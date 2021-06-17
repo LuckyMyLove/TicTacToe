@@ -61,20 +61,21 @@ def send_receive_client_message(client_connection, client_ip_addr):
     new_client = client_connection.recv(4096).decode(FORMAT)
     new_player_info = json.loads(new_client)
 
-    current_room_id = new_player_info["room_id"]
-    current_player_id = new_player_info["player_id"]
+    current_room_id = ObjectId(new_player_info["room_id"])
+    current_player_id = ObjectId(new_player_info["player_id"])
 
     game_info = game_data.find_one({"_id": ObjectId(current_room_id)})
-    player1_nick = users_data.find_one({"_id": ObjectId(game_info["u1_id"])})["username"]
+    player1_nick = users_data.find_one({"_id": game_info["u1_id"]})["username"]
 
     you_are_u1 = False
     #if we are the second player - update database
     if ObjectId(current_player_id) != game_info["u1_id"]:
-        game_data.update_one({"_id": "room_id"}, {"$set": {"id_u2": current_player_id}})
+        game_data.update_one({"_id": current_room_id}, {"$set": {"u2_id": current_player_id}})
+        game_info = game_data.find_one({"_id": ObjectId(current_room_id)})
     else:
         you_are_u1 = True
 
-    player2_nick = users_data.find_one({"_id": game_info["u2_id"]})["username"] if game_data["u2_id"] else ""
+    player2_nick = users_data.find_one({"_id": game_info["u2_id"]})["username"] if game_info["u2_id"] != "" else ""
 
     # your_symbol = "X" if ObjectId(current_player_id) == game_info["u1_id"] else "O"
     your_symbol = "X" if you_are_u1 else "O"
@@ -87,20 +88,22 @@ def send_receive_client_message(client_connection, client_ip_addr):
     current_turn = game_info["current_turn"]
     current_game_board = game_data.find_one({"_id": ObjectId(current_room_id)})["moves"]
 
+    data_set = {"command":"welcome_first_player", "updated_board": current_game_board, "current_turn": current_turn,
+                                           "your_symbol": your_symbol, "your_nick": your_nick, "opponent_nick": opponent_nick, "your_score": your_score, "opponent_score": opponent_score}
     #one of the possible starts for player
     if len(current_game_threads) < 2:
-        current_game_threads[0].send(json.dumps({"command":"welcome_first_player", "updated_board": current_game_board, "current_turn": current_turn,
-                                           "your_symbol": your_symbol, "your_nick": your_nick, "opponent_nick": opponent_nick, "your_score": your_score, "opponent_score": opponent_score}).encode(FORMAT))
+        current_game_threads[0].send(json.dumps(data_set).encode(FORMAT))
     else:
-        current_game_threads[1].send(json.dumps({"command":"welcome_second_player", "updated_board": current_game_board, "current_turn": current_turn,
-                                           "your_symbol": your_symbol, "your_nick": your_nick, "opponent_nick": opponent_nick, "your_score": your_score, "opponent_score": opponent_score}).encode(FORMAT))
+        data_set["command"] = "welcome_second_player"
+        current_game_threads[1].send(json.dumps(data_set).encode(FORMAT))
 
     #sending info that we can start
     if len(current_game_threads) > 1 and len(current_game_board) == 0:
+        data_set["command"] = "first_game_start"
         current_game_threads[0].send(
-            json.dumps({"command": "first_game_start"}).encode(FORMAT))
+            json.dumps(data_set).encode(FORMAT))
         current_game_threads[1].send(
-            json.dumps({"command": "first_game_start"}).encode(FORMAT))
+            json.dumps(data_set).encode(FORMAT))
 
     while True:
         # get the player choice from received data

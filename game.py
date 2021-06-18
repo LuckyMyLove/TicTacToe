@@ -29,8 +29,9 @@ opponent_details = {
     "score": 0
 }
 
+
 def start_the_game(player_id, room_id):
-    #in case is someone go out and come back
+    # in case is someone go out and come back
     global board_checked_fields, your_turn
     board_checked_fields = []
     your_turn = False
@@ -51,16 +52,16 @@ def start_the_game(player_id, room_id):
     gamePoints.grid(column=1, row=1)
     gameHistory.grid(column=1, row=2)
 
-
     lbl_status = ttk.Label(gameInfo, text="Status: Not connected to server", font="Helvetica 14 bold")
     lbl_status.grid(row=1, pady="3")
 
-    player_scores = ttk.Label(gamePoints, text="Players scores:\n{}: {}\n{}: {}".format(your_details["name"], "200", opponent_details["name"], "100"), font=('consolas 8'), justify=CENTER)
+    player_scores = ttk.Label(gamePoints,
+                              text="Players scores:\n{}: {}\n{}: {}".format(your_details["name"], "200", opponent_details["name"], "100"),
+                              font=('consolas 8'), justify=CENTER)
     player_scores.grid(row=1)
 
-    moves_history = ttk.Label(gameHistory, text="Round history:\n...",font=('consolas 10'), justify=CENTER)
+    moves_history = ttk.Label(gameHistory, text="Round history:\n...", font=('consolas 10'), justify=CENTER)
     moves_history.grid(row=1)
-
 
     buttonsList = [[], [], []]
     for i in range(3):
@@ -69,7 +70,6 @@ def start_the_game(player_id, room_id):
                 Button(gameBoard, text="   ", width=3, padx=5, bd=5, bg="gold2", font=('arial', 60, 'bold'), relief="sunken"))
             buttonsList[i][j].config(command=lambda row=i, col=j: click(row, col))
             buttonsList[i][j].grid(row=i, column=j)
-
 
     def check():  # Checks for victory or Draw
         global your_details
@@ -91,7 +91,6 @@ def start_the_game(player_id, room_id):
                   "state"] == DISABLED):
             client.send(json.dumps({"command": "draw"}).encode(FORMAT))
 
-
     def click(row, col):
         global your_turn, board_checked_fields
 
@@ -106,29 +105,28 @@ def start_the_game(player_id, room_id):
             buttonsList[row][col].config(text=your_details["symbol"], state=DISABLED, disabledforeground=your_details["color"])
             your_turn = False
 
-            moves_history["text"] = moves_history["text"].replace("\n...","")
+            moves_history["text"] = moves_history["text"].replace("\n...", "")
             moves_history["text"] = moves_history["text"] + "\n{} -> [{},{}]".format(your_details["symbol"], row, col)
 
             client.send(json.dumps(
-                {"command": "new_move", "updated_board": board_checked_fields, "next_turn_symbol": opponent_details["symbol"]}).encode(FORMAT))
+                {"command": "new_move", "updated_board": board_checked_fields, "next_turn_symbol": opponent_details["symbol"]}).encode(
+                FORMAT))
             lbl_status["text"] = "STATUS: " + opponent_details["name"] + "'s turn! (" + opponent_details["symbol"] + ")"
 
             check()
-
 
     def update_board(updated_board):
         global your_turn, your_details, board_checked_fields
         if len(updated_board) > len(board_checked_fields):
             board_checked_fields = updated_board
 
-
-        #update current board and update game history
+        # update current board and update game history
         moves_history["text"] = "Game history:" if len(updated_board) > 0 else "Game history:\n..."
         for single_move in board_checked_fields:
             color = your_details["color"] if single_move["symbol"] == your_details["symbol"] else opponent_details["color"]
             buttonsList[single_move["row"]][single_move["col"]].config(text=single_move["symbol"], state=DISABLED, disabledforeground=color)
-            moves_history["text"] = moves_history["text"] + "\n{} -> [{},{}]".format(single_move["symbol"], single_move["row"], single_move["col"])
-
+            moves_history["text"] = moves_history["text"] + "\n{} -> [{},{}]".format(single_move["symbol"], single_move["row"],
+                                                                                     single_move["col"])
 
 
     def connect_to_server(game_data):
@@ -143,7 +141,6 @@ def start_the_game(player_id, room_id):
 
         except Exception as e:
             messagebox.showerror(title="ERROR!!!", message=e)
-
 
     def receive_message_from_server(client_socket, m):
         global your_details, opponent_details, your_turn
@@ -170,7 +167,6 @@ def start_the_game(player_id, room_id):
                     opponent_details["score"] = msg["opponent_score"]
                     player_scores["text"] = "Players scores:\n{}: {}\n{}: {}".format(your_details["name"], your_details["score"],
                                                                                      opponent_details["name"], opponent_details["score"])
-
                 # if it's continuation of the game
                 if msg["current_turn"] == your_details["symbol"]:
                     if len(msg["updated_board"]) > 0:
@@ -197,8 +193,15 @@ def start_the_game(player_id, room_id):
                 update_board(msg["updated_board"])
 
 
-            #it's turned on only if match is from the start
+            # it's turned on only if match is from the start
             elif msg["command"] == "first_game_start":
+                #adding missing data for player1
+                if your_details["symbol"] == "X":
+                    opponent_details["name"] = msg["opponent_nick"]
+                    opponent_details["score"] = msg["opponent_score"]
+                    player_scores["text"] = "Players scores:\n{}: {}\n{}: {}".format(your_details["name"], your_details["score"],
+                                                                                     opponent_details["name"], opponent_details["score"])
+
                 lbl_status["text"] = "STATUS: " + opponent_details["name"] + " is connected!"
                 sleep(3)
 
@@ -252,4 +255,9 @@ def start_the_game(player_id, room_id):
     window.resizable(False, False)
     window.mainloop()
 
-#start_the_game()
+
+# start_the_game()
+# room_id = "60cbe1348cc92a7085bbaadc"
+# player_id = "60c3d0ae531e2ceec167b23a"
+# #player_id = "60c3d13127d155fbbdb05592"
+# start_the_game(player_id, room_id)

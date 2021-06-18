@@ -77,7 +77,6 @@ def send_receive_client_message(client_connection, client_ip_addr):
 
     player2_nick = users_data.find_one({"_id": game_info["u2_id"]})["username"] if game_info["u2_id"] != "" else ""
 
-    # your_symbol = "X" if ObjectId(current_player_id) == game_info["u1_id"] else "O"
     your_symbol = "X" if you_are_u1 else "O"
     your_nick = player1_nick if you_are_u1 else player2_nick
     opponent_nick = player2_nick if your_nick == player1_nick else player1_nick
@@ -90,6 +89,7 @@ def send_receive_client_message(client_connection, client_ip_addr):
 
     data_set = {"command":"welcome_first_player", "updated_board": current_game_board, "current_turn": current_turn,
                                            "your_symbol": your_symbol, "your_nick": your_nick, "opponent_nick": opponent_nick, "your_score": your_score, "opponent_score": opponent_score}
+
     #one of the possible starts for player
     if len(current_game_threads) < 2:
         current_game_threads[0].send(json.dumps(data_set).encode(FORMAT))
@@ -97,19 +97,29 @@ def send_receive_client_message(client_connection, client_ip_addr):
         data_set["command"] = "welcome_second_player"
         current_game_threads[1].send(json.dumps(data_set).encode(FORMAT))
 
+
+
     #sending info that we can start
     if len(current_game_threads) > 1 and len(current_game_board) == 0:
+        # it's needed to sending missing data to player1 on the start of the match
+        if not you_are_u1:
+            if current_game_threads[0] == client_connection:
+                player1_thread_index = 1
+                player2_thread_index = 0
+            else:
+                player1_thread_index = 0
+                player2_thread_index = 1
+
         data_set["command"] = "first_game_start"
-        current_game_threads[0].send(
-            json.dumps(data_set).encode(FORMAT))
-        current_game_threads[1].send(
-            json.dumps(data_set).encode(FORMAT))
+        current_game_threads[player1_thread_index].send(json.dumps({"command": "first_game_start", "current_turn": current_turn, "opponent_nick": your_nick, "opponent_score": your_score}).encode(FORMAT))
+        current_game_threads[player2_thread_index].send(json.dumps({"command": "first_game_start", "current_turn": current_turn}).encode(FORMAT))
 
     while True:
         # get the player choice from received data
         data = client_connection.recv(4096).decode(FORMAT)
         if not data: break
         msg = json.loads(data)
+
         # player x,y coordinate data. forward to the other player
         if msg["command"] == "new_move":
             # changing turn if last moved symbol is different

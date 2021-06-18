@@ -143,6 +143,7 @@ def send_receive_client_message(client_connection, client_ip_addr):
                 current_game_threads[0].send(json.dumps({"command":"new_move", "updated_board": current_game_board, "current_turn": current_turn}).encode(FORMAT))
 
         if msg["command"] == "game_won":
+            game_info = game_data.find_one({"_id": ObjectId(current_room_id)})
             game_data.update_one({"_id": ObjectId(current_room_id)}, {"$set": {"is_finished": 1, "winner": msg["winner_symbol"]}})
 
             winner_id = game_info["u1_id"] if msg["winner_symbol"] == "X" else game_info["u2_id"]
@@ -155,7 +156,9 @@ def send_receive_client_message(client_connection, client_ip_addr):
                 current_game_threads[1].send(json.dumps({"command":"game_won", "winner_nick": winner_nick}).encode(FORMAT))
 
         if msg["command"] == "draw":
+            game_info = game_data.find_one({"_id": ObjectId(current_room_id)})
             game_data.update_one({"_id": ObjectId(current_room_id)}, {"$set": {"is_finished": 1, "winner": "draw"}})
+
 
             winner_points = users_data.find_one({"_id": game_info["u1_id"]})["points"]
             users_data.update_one({"_id": game_info["u1_id"]}, {"$set": {"points": winner_points + 100}})
